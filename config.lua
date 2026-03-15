@@ -1672,7 +1672,7 @@ function TUI:BuildConfig()
     local fp = root.unitframes.args.fakePower.args
 
     fp.soulFragments = ACH:Toggle(
-        E.NewSign .. "VDH: Soul Fragments",
+        "VDH: Soul Fragments",
         "Show a Soul Fragments class bar for Vengeance Demon Hunters. Anchors to the ElvUI class bar mover.",
         1, nil, nil, nil,
         function() return TUI.db.profile.fakePower.soulFragments end,
@@ -1683,7 +1683,7 @@ function TUI:BuildConfig()
     )
 
     fp.ironfurBar = ACH:Toggle(
-        E.NewSign .. "Bear: Ironfur",
+        "Bear: Ironfur",
         "Show an Ironfur duration bar for Guardian Druids. Anchors to the ElvUI class bar mover.",
         2, nil, nil, nil,
         function() return TUI.db.profile.fakePower.ironfurBar end,
@@ -1843,7 +1843,7 @@ function TUI:BuildConfig()
     npHL.disableFriendlyHighlight.customWidth = 250
 
     npHL.hideFriendlyRealm = ACH:Toggle(
-        "Hide Friendly Realm Names",
+        E.NewSign .. "Hide Friendly Realm Names",
         "Remove realm name suffixes from friendly nameplates.",
         2, nil, nil, nil,
         function() return TUI.db.profile.nameplates.hideFriendlyRealm end,
