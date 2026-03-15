@@ -371,10 +371,18 @@ local function GetWinDB(winIndex)
     return proxy
 end
 
+local cachedClassR, cachedClassG, cachedClassB, cachedClassName
+
+local function CacheClassColor(classFilename)
+    if classFilename == cachedClassName then return end
+    cachedClassName = classFilename
+    cachedClassR, cachedClassG, cachedClassB = TUI:GetClassColor(classFilename)
+end
+
 local function ClassOrColor(db, flagKey, colorKey, classFilename)
     if db[flagKey] then
-        local r, g, b = TUI:GetClassColor(classFilename)
-        if r then return r, g, b, db[colorKey].a end
+        CacheClassColor(classFilename)
+        if cachedClassR then return cachedClassR, cachedClassG, cachedClassB, db[colorKey].a end
     end
     local c = db[colorKey]
     return c.r, c.g, c.b, c.a
@@ -797,17 +805,14 @@ local function BuildSessionMenu(win)
 
     -- Encounter sessions first (oldest at top, newest at bottom)
     if C_DamageMeter.GetAvailableCombatSessions then
-        local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
-        if ok and sessions and #sessions > 0 then
+        local sessions = C_DamageMeter.GetAvailableCombatSessions()
+        if sessions and #sessions > 0 then
             for _, sess in ipairs(sessions) do
                 local sid = sess.sessionId or sess.combatSessionId or sess.id or sess.sessionID
-                local label = sess.name or "Encounter"
+                local label = sess.name or 'Encounter'
                 local dur = sess.durationSeconds or sess.duration
                 if dur and not IsSecret(dur) then
-                    local timeOk, timeStr = pcall(function()
-                        return format("[%d:%02d]", floor(dur / 60), floor(dur % 60))
-                    end)
-                    if timeOk then label = label .. " " .. timeStr end
+                    label = label .. format(' [%d:%02d]', floor(dur / 60), floor(dur % 60))
                 end
                 menu[#menu + 1] = {
                     text = (win.sessionId == sid) and ("|cffffd100" .. label .. "|r") or label,
@@ -1117,26 +1122,29 @@ local SESSION_LABELS = {
     [Enum.DamageMeterSessionType.Overall] = "Overall",
 }
 
+local sessionLabelCache = {}
+
 local function GetSessionLabel(win)
     if win.sessionId then
+        local cached = sessionLabelCache[win.sessionId]
+        if cached then return cached end
         if C_DamageMeter.GetAvailableCombatSessions then
-            local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
-            if ok and sessions then
+            local sessions = C_DamageMeter.GetAvailableCombatSessions()
+            if sessions then
                 for i, sess in ipairs(sessions) do
                     local sid = sess.sessionId or sess.combatSessionId or sess.id or sess.sessionID
                     if sid == win.sessionId then
-                        local label = sess.name or "Encounter"
-                        if label == "Encounter" then
-                            label = "Encounter " .. i
-                        end
+                        local label = sess.name or 'Encounter'
+                        if label == 'Encounter' then label = 'Encounter ' .. i end
+                        sessionLabelCache[win.sessionId] = label
                         return label
                     end
                 end
             end
         end
-        return "Encounter"
+        return 'Encounter'
     end
-    return SESSION_LABELS[win.sessionType] or "?"
+    return SESSION_LABELS[win.sessionType] or '?'
 end
 
 GetSession = function(win, meterType)
@@ -1328,23 +1336,20 @@ RefreshWindow = function(win)
 
                 bar.statusbar:SetStatusBarColor(fgR, fgG, fgB)
                 bar.statusbar:SetMinMaxValues(0, topVal)
-                local ok3, _ = pcall(function() bar.statusbar:SetValue(amt) end)
-                if not ok3 then bar.statusbar:SetValue(0) end
                 bar.background:SetVertexColor(bgR, bgG, bgB, bgA)
-
                 bar.leftText:SetText(spellName)
                 bar.leftText:SetTextColor(tR, tG, tB)
 
-                local ok5 = pcall(function()
+                if issecretvalue(amt) then
+                    bar.statusbar:SetValue(0)
+                    bar.rightText:SetText('?')
+                    bar.pctText:SetText('')
+                else
+                    bar.statusbar:SetValue(amt)
                     bar.rightText:SetText(TruncateDecimals(AbbreviateNumbers(RoundIfPlain(amt))))
-                end)
-                if not ok5 then bar.rightText:SetText('?') end
+                    bar.pctText:SetText(totalAmt > 0 and format('%.1f%%', (amt / totalAmt) * 100) or '')
+                end
                 bar.rightText:SetTextColor(vR, vG, vB)
-
-                local ok4, pctStr = pcall(function()
-                    return format("%.1f%%", (amt / totalAmt) * 100)
-                end)
-                bar.pctText:SetText(ok4 and pctStr or "")
                 bar.pctText:SetTextColor(vR * 0.7, vG * 0.7, vB * 0.7)
             end
         end
@@ -1425,16 +1430,13 @@ RefreshWindow = function(win)
 
     if win.sessionType then
         local dur = C_DamageMeter.GetSessionDurationSeconds(win.sessionType)
-        if dur then
-            local ok = pcall(function()
-                win.header.timer:SetText(format("%d:%02d", floor(dur / 60), floor(dur % 60)))
-            end)
-            if not ok then win.header.timer:SetText("--:--") end
+        if dur and not issecretvalue(dur) then
+            win.header.timer:SetText(format('%d:%02d', floor(dur / 60), floor(dur % 60)))
         else
-            win.header.timer:SetText("")
+            win.header.timer:SetText('')
         end
     else
-        win.header.timer:SetText("")
+        win.header.timer:SetText('')
     end
 
     local session    = GetSession(win, meterType)
@@ -1691,11 +1693,8 @@ local function OnUpdate(_, dt)
         if not win.header or not win.header.timer then break end
         if win.sessionType then
             local dur = C_DamageMeter.GetSessionDurationSeconds(win.sessionType)
-            if dur then
-                local ok = pcall(function()
-                    win.header.timer:SetText(format("%d:%02d", floor(dur / 60), floor(dur % 60)))
-                end)
-                if not ok then win.header.timer:SetText("--:--") end
+            if dur and not issecretvalue(dur) then
+                win.header.timer:SetText(format('%d:%02d', floor(dur / 60), floor(dur % 60)))
             end
         end
     end
@@ -1881,11 +1880,13 @@ function TUI:InitDamageMeter()
                     end
                 end
             elseif event == 'DAMAGE_METER_RESET' then
+                wipe(sessionLabelCache)
                 for _, w in pairs(windows) do
                     ResetWindowState(w)
                 end
                 TUI:RefreshMeter()
             else
+                wipe(sessionLabelCache)
                 TUI:RefreshMeter()
             end
         end)

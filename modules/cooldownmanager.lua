@@ -814,7 +814,6 @@ local function LayoutContainer(viewerKey, isCapture)
 	local iconZoom = vdb.iconZoom
 
 	for _, icon in ipairs(icons) do
-		icon:SetScale(1)
 		icon:SetSize(iconW, iconH)
 
 		ApplyIconZoom(icon, iconZoom)
@@ -992,12 +991,10 @@ ApplyBarStyle = function(frame, vdb)
 
 	-- Hide icon overlay texture (atlas UI-HUD-CoolDownManager-IconOverlay)
 	if icon and not frame.tuiIconOverlayKilled then
-		for _, region in next, { icon:GetRegions() } do
-			if region:IsObjectType('Texture') then
-				local atlas = region:GetAtlas()
-				if atlas == 'UI-HUD-CoolDownManager-IconOverlay' then
-					region:SetAlpha(0)
-				end
+		for i = 1, select('#', icon:GetRegions()) do
+			local region = select(i, icon:GetRegions())
+			if region and region:IsObjectType('Texture') and region:GetAtlas() == 'UI-HUD-CoolDownManager-IconOverlay' then
+				region:SetAlpha(0)
 			end
 		end
 		frame.tuiIconOverlayKilled = true
@@ -1108,7 +1105,6 @@ LayoutBuffBar = function(viewerKey, isCapture)
 			local yOff = yDir * row * (barH + spacing)
 
 			-- Left bar: full width if unpaired (odd last), otherwise half
-			left:SetScale(1)
 			left:SetSize(right and colW or barW, barH)
 			left.tuiBarIconSide = right and 'RIGHT' or 'LEFT'
 			if isCapture or not styledFrames[left] then
@@ -1121,7 +1117,6 @@ LayoutBuffBar = function(viewerKey, isCapture)
 
 			-- Right bar (absent on odd-count last row)
 			if right then
-				right:SetScale(1)
 				right:SetSize(colW, barH)
 				right.tuiBarIconSide = 'LEFT'
 				if isCapture or not styledFrames[right] then
@@ -1137,7 +1132,6 @@ LayoutBuffBar = function(viewerKey, isCapture)
 		container:SetSize(barW, count * barH + (count - 1) * spacing)
 
 		for i, frame in ipairs(bars) do
-			frame:SetScale(1)
 			frame:SetSize(barW, barH)
 			frame.tuiBarIconSide = 'LEFT'
 
@@ -1490,18 +1484,25 @@ function TUI:InitCooldownManager()
 		-- Mirror player frame fader alpha to FADER-mode CDM containers
 		local playerFrame = _G.ElvUF_Player
 		if playerFrame then
-			hooksecurefunc(playerFrame, 'SetAlpha', function(pf)
-				local alpha = pf:GetAlpha()
-				for viewerKey in pairs(VIEWER_KEYS) do
-					local vdb = GetViewerDB(viewerKey)
-					if vdb and vdb.visibleSetting == 'FADER' then
-						local container = containers[viewerKey]
+			local faderTargets = {}
+			for viewerKey in pairs(VIEWER_KEYS) do
+				local vdb = GetViewerDB(viewerKey)
+				if vdb and vdb.visibleSetting == 'FADER' then
+					faderTargets[#faderTargets + 1] = viewerKey
+				end
+			end
+			if #faderTargets > 0 then
+				hooksecurefunc(playerFrame, 'SetAlpha', function(pf)
+					local alpha = pf:GetAlpha()
+					for i = 1, #faderTargets do
+						local vk = faderTargets[i]
+						local container = containers[vk]
 						if container then container:SetAlpha(alpha) end
-						local viewer = GetViewer(viewerKey)
+						local viewer = GetViewer(vk)
 						if viewer then viewer:SetAlpha(alpha) end
 					end
-				end
-			end)
+				end)
+			end
 		end
 
 		-- Right-click context menu for buff CDM items
