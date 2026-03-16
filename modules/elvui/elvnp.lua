@@ -9,6 +9,7 @@ function TUI:InitElvNP()
 	local np = self.db.profile.nameplates
 	if not np then return end
 
+	-- Pending removal based on ElvUI updates
 	if np.hideFriendlyRealm
 		and NamePlateFriendlyFrameOptions and TextureLoadingGroupMixin
 		and NamePlateFriendlyFrameOptions.updateNameUsesGetUnitName then
@@ -16,6 +17,9 @@ function TUI:InitElvNP()
 		NamePlateFriendlyFrameOptions.updateNameUsesGetUnitName = 0
 		TextureLoadingGroupMixin.RemoveTexture(wrapper, 'updateNameUsesGetUnitName')
 	end
+
+	-- Override target indicator color with player's class color
+	self:HookClassColorTargetIndicator()
 
 	if np.classificationInstanceOnly then
 		self:HookClassificationInstanceOnly()
@@ -43,6 +47,54 @@ function TUI:InitElvNP()
 		self:HookQuestColor()
 	end
 
+end
+
+do -- Class Color Target Indicator
+	local UnitIsUnit = UnitIsUnit
+
+	local function PostUpdate_ClassColorTarget(element, unit)
+		if not TUI.db.profile.nameplates.classColorTargetIndicator then return end
+		if not unit or not UnitIsUnit(unit, 'target') then return end
+
+		local c = E:ClassColor(E.myclass)
+		if not c then return end
+
+		if element.TopIndicator and element.TopIndicator:IsShown() then
+			element.TopIndicator:SetVertexColor(c.r, c.g, c.b)
+		end
+		if element.LeftIndicator and element.LeftIndicator:IsShown() then
+			element.LeftIndicator:SetVertexColor(c.r, c.g, c.b)
+		end
+		if element.RightIndicator and element.RightIndicator:IsShown() then
+			element.RightIndicator:SetVertexColor(c.r, c.g, c.b)
+		end
+		if element.Shadow and element.Shadow:IsShown() then
+			element.Shadow:SetBackdropBorderColor(c.r, c.g, c.b)
+		end
+		if element.Spark and element.Spark:IsShown() then
+			element.Spark:SetVertexColor(c.r, c.g, c.b)
+		end
+	end
+
+	function TUI:HookClassColorTargetIndicator()
+		if self._hookedClassColorTarget then return end
+		self._hookedClassColorTarget = true
+
+		hooksecurefunc(NP, 'Update_TargetIndicator', function(_, nameplate)
+			if nameplate and nameplate.TargetIndicator then
+				nameplate.TargetIndicator.PostUpdate = PostUpdate_ClassColorTarget
+			end
+		end)
+
+		-- Catch plates configured before our hook
+		C_Timer.After(0, function()
+			for nameplate in pairs(NP.Plates) do
+				if nameplate.TargetIndicator then
+					nameplate.TargetIndicator.PostUpdate = PostUpdate_ClassColorTarget
+				end
+			end
+		end)
+	end
 end
 
 do -- Classification Instance Only
@@ -98,7 +150,6 @@ end
 do
 	local GetSpellCooldownDuration = C_Spell.GetSpellCooldownDuration
 	local EvalColorBool = C_CurveUtil.EvaluateColorValueFromBoolean
-	local EvalColor = C_CurveUtil.EvaluateColorFromBoolean
 	local UnitCanAttack = UnitCanAttack
 	local UnitChannelInfo = UnitChannelInfo
 	local GetSpecialization = GetSpecialization
@@ -201,9 +252,19 @@ do
 		local unit = castbar.unit or castbar.__owner.unit
 		if not (unit and UnitCanAttack('player', unit)) then return end
 
-		local color = EvalColor(cooldown:IsZero(), colors.ready, colors.onCD)
-		if castbar.notInterruptible ~= nil then color = EvalColor(castbar.notInterruptible, colors.ready, color) end
-		castbar:SetStatusBarColor(color:GetRGBA())
+		local ready, onCD = colors.ready, colors.onCD
+		local isReady = cooldown:IsZero()
+		local r = EvalColorBool(isReady, ready.r, onCD.r)
+		local g = EvalColorBool(isReady, ready.g, onCD.g)
+		local b = EvalColorBool(isReady, ready.b, onCD.b)
+
+		if castbar.notInterruptible ~= nil then
+			r = EvalColorBool(castbar.notInterruptible, ready.r, r)
+			g = EvalColorBool(castbar.notInterruptible, ready.g, g)
+			b = EvalColorBool(castbar.notInterruptible, ready.b, b)
+		end
+
+		castbar:SetStatusBarColor(r, g, b)
 	end
 
 	local function UpdateCast(castbar, castStart)

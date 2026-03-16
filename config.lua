@@ -41,6 +41,7 @@ TUI.defaults = {
             skinBugSack     = false,
         },
         nameplates = {
+            classColorTargetIndicator = false,
             classificationOverThreat = false,
             classificationInstanceOnly = false,
             interruptCastbarColors      = false,
@@ -1692,6 +1693,18 @@ function TUI:BuildConfig()
     )
 
     root.nameplates = ACH:Group("Nameplates", nil, 4)
+
+    root.nameplates.args.target = ACH:Group("Target Indicator", nil, 0)
+    root.nameplates.args.target.inline = true
+    root.nameplates.args.target.args.classColorTargetIndicator = ACH:Toggle(
+        "Class Color",
+        "Override the target indicator color with your class color.",
+        1, nil, nil, nil,
+        function() return TUI.db.profile.nameplates.classColorTargetIndicator end,
+        function(_, value)
+            TUI.db.profile.nameplates.classColorTargetIndicator = value
+        end
+    )
 
     root.nameplates.args.threat = ACH:Group("Threat", nil, 1)
     root.nameplates.args.threat.inline = true
