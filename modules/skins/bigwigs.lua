@@ -143,9 +143,7 @@ do -- LFG Timer Skin
 			end
 		end)
 
-		local eventFrame = CreateFrame('Frame')
-		eventFrame:RegisterEvent('LFG_PROPOSAL_SHOW')
-		eventFrame:SetScript('OnEvent', function()
+		TUI:RegisterEvent('LFG_PROPOSAL_SHOW', function()
 			C_Timer.After(0.05, ApplyLFGSkin)
 		end)
 	end

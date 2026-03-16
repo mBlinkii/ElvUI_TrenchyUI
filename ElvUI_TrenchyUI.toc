@@ -11,20 +11,6 @@
 
 core.lua
 config.lua
-profiles\elvui.lua
-profiles\bigwigs.lua
-profiles\warpdeplete.lua
-profiles\lstoasts.lua
-modules\skins\warpdeplete.lua
-modules\skins\bigwigs.lua
-modules\qol.lua
-modules\elvui\elvnp.lua
-modules\elvui\elvuf.lua
-modules\skins\auctionator.lua
-modules\skins\bugsack.lua
-modules\skins\opie.lua
-modules\skins\cooldownviewer.lua
-modules\datatexts\guild.lua
-modules\datatexts\friends.lua
-modules\damagemeter.lua
-modules\cooldownmanager.lua
+init.lua
+profiles\load_profiles.xml
+modules\load_modules.xml

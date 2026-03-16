@@ -6,58 +6,8 @@ local LSM = E.Libs.LSM
 local hooksecurefunc = hooksecurefunc
 local GetSpecialization = GetSpecialization
 local UnitClass = UnitClass
-local IsFlying = IsFlying
+local CreateFrame = CreateFrame
 
-local UnitPower, UnitPowerType, UnitPowerPercent, format = UnitPower, UnitPowerType, UnitPowerPercent, format
-local ScaleTo100 = CurveConstants and CurveConstants.ScaleTo100
-
--- Smart Power tag: shows percentage for mana users, current value otherwise
-E:AddTag('tui-smartpower', 'UNIT_DISPLAYPOWER UNIT_POWER_FREQUENT UNIT_MAXPOWER', function(unit)
-	local powerType = UnitPowerType(unit)
-	if powerType == Enum.PowerType.Mana then
-		return format('%d', UnitPowerPercent(unit, nil, true, ScaleTo100))
-	else
-		return UnitPower(unit)
-	end
-end)
-E:AddTagInfo('tui-smartpower', E:TextGradient('TrenchyUI', 1.00,0.18,0.24, 0.80,0.10,0.20), 'Shows power percentage for mana specs, current power for others')
-
--- Power tag responsiveness: bypass oUF's 100ms event batching delay
-hooksecurefunc(UF, 'Configure_Power', function(_, frame)
-	if frame and frame.Power and frame.Power.value then
-		frame.Power.value.frequentUpdates = 0.05
-	end
-end)
-
--- Fake Power fix
-hooksecurefunc(UF, 'Configure_ClassBar', function(_, frame)
-	if not frame or not frame.ClassBar then return end
-	if frame.ClassBar ~= 'ClassPower' and frame.ClassBar ~= 'Runes' and frame.ClassBar ~= 'Totems' then return end
-
-	local bars = frame[frame.ClassBar]
-	if not bars then return end
-
-	local containerW = bars:GetWidth()
-	local containerH = bars:GetHeight()
-	if not containerW or containerW <= 0 then return end
-	if not containerH or containerH <= 0 then return end
-
-	local MAX_CLASS_BAR = frame.MAX_CLASS_BAR or 0
-	if MAX_CLASS_BAR < 1 then return end
-
-	for i = 1, MAX_CLASS_BAR do
-		local bar = bars[i]
-		if not bar then break end
-		if bar:GetWidth() > containerW then
-			bar:SetWidth(containerW)
-		end
-		if bar:GetHeight() > containerH then
-			bar:SetHeight(containerH)
-		end
-	end
-end)
-
--- VDH Soul Fragments
 local SOUL_FRAGMENT_MAX = 6
 local SOUL_CLEAVE_SPELL = 228477
 local C_Spell_GetSpellCastCount = C_Spell and C_Spell.GetSpellCastCount
@@ -260,47 +210,7 @@ function TUI:InitSoulFragments()
 		self:InitFakePowerFader()
 		OnSpecChanged()
 
-		local specFrame = CreateFrame('Frame')
-		specFrame:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED')
-		specFrame:SetScript('OnEvent', OnSpecChanged)
-	end)
-end
-
-
--- Pixel Glow
-local LCG = E.Libs.CustomGlow
-local GLOW_KEY = 'TUI_PixelGlow'
-local glowColor = { 1, 1, 1, 1 }
-
-local function GetPixelGlowDB()
-	local db = TUI.db and TUI.db.profile and TUI.db.profile.pixelGlow
-	if not db then return false, 8, 0.25, 2 end
-	return db.enabled, db.lines, db.speed, db.thickness
-end
-
-function TUI:InitPixelGlow()
-	local enabled = GetPixelGlowDB()
-	if not enabled then return end
-	if not LCG or not LCG.PixelGlow_Start then return end
-
-	hooksecurefunc(UF, 'PostUpdate_AuraHighlight', function(_, frame, _, aura, debuffType)
-		if not frame then return end
-		local element = frame.AuraHighlight
-		if not element then return end
-
-		local _, lines, speed, thickness = GetPixelGlowDB()
-		local glowTarget = frame.Health or frame
-
-		if aura or debuffType then
-			glowColor[1], glowColor[2], glowColor[3] = element:GetVertexColor()
-			element:SetVertexColor(0, 0, 0, 0)
-			if frame.AuraHightlightGlow then frame.AuraHightlightGlow:Hide() end
-			LCG.PixelGlow_Start(glowTarget, glowColor, lines, speed, nil, thickness, 0, 0, false, GLOW_KEY)
-		else
-			element:SetVertexColor(0, 0, 0, 0)
-			if frame.AuraHightlightGlow then frame.AuraHightlightGlow:Hide() end
-			LCG.PixelGlow_Stop(glowTarget, GLOW_KEY)
-		end
+		TUI:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED', OnSpecChanged)
 	end)
 end
 
@@ -317,64 +227,4 @@ do
 			if sfHolder then sfHolder:SetAlpha(alpha) end
 		end)
 	end
-end
-
--- Steady Flight fader extension
-local sfOverridden = false
-
-local function IsSteadyFlightEnabled()
-	local db = TUI.db and TUI.db.profile and TUI.db.profile.fader
-	return db and db.steadyFlight
-end
-
-local function GetPlayerFaderDB()
-	return E.db and E.db.unitframe and E.db.unitframe.units
-		and E.db.unitframe.units.player and E.db.unitframe.units.player.fader
-end
-
-function TUI:InitSteadyFlight()
-	C_Timer.After(0, function()
-		local playerFrame = _G.ElvUF_Player
-		if not playerFrame then return end
-
-		-- Fix fader count if Configure_Fader runs while we've suppressed DynamicFlight
-		hooksecurefunc(UF, 'Configure_Fader', function(_, frame)
-			if frame ~= playerFrame or not sfOverridden then return end
-			local fader = frame.Fader
-			if fader and fader.DynamicFlight and fader.count and fader.count > 0 then
-				fader.count = fader.count - 1
-			end
-			sfOverridden = false
-		end)
-
-		-- Poll IsFlying() and suppress the DynamicFlight condition while airborne
-		C_Timer.NewTicker(0.2, function()
-			local pf = _G.ElvUF_Player
-			if not pf or not pf.Fader then return end
-
-			local faderDB = GetPlayerFaderDB()
-			local dbEnabled = faderDB and faderDB.dynamicflight
-
-			-- Restore if our feature or DynamicFlight was turned off
-			if not IsSteadyFlightEnabled() or not dbEnabled then
-				if sfOverridden then
-					sfOverridden = false
-					pf.Fader.DynamicFlight = dbEnabled or nil
-					pf.Fader:ForceUpdate()
-				end
-				return
-			end
-
-			local flying = IsFlying()
-			if flying and not sfOverridden then
-				pf.Fader.DynamicFlight = false
-				sfOverridden = true
-				pf.Fader:ForceUpdate()
-			elseif not flying and sfOverridden then
-				pf.Fader.DynamicFlight = true
-				sfOverridden = false
-				pf.Fader:ForceUpdate()
-			end
-		end)
-	end)
 end

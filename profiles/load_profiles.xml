@@ -1,0 +1,6 @@
+<Ui>
+	<Script file="elvui.lua"/>
+	<Script file="bigwigs.lua"/>
+	<Script file="warpdeplete.lua"/>
+	<Script file="lstoasts.lua"/>
+</Ui>

@@ -1,0 +1,190 @@
+-- Adapted from mMediaTag with permission from Blinkii, 2026-03-14
+local E = unpack(ElvUI)
+local TUI = E:GetModule('TrenchyUI')
+local NP = E:GetModule('NamePlates')
+
+local GetSpellCooldownDuration = C_Spell.GetSpellCooldownDuration
+local EvalColorBool = C_CurveUtil.EvaluateColorValueFromBoolean
+local UnitCanAttack = UnitCanAttack
+local UnitChannelInfo = UnitChannelInfo
+local GetSpecialization = GetSpecialization
+local GetSpecializationInfo = GetSpecializationInfo
+local IsPlayerSpell = IsPlayerSpell
+local CreateFrame = CreateFrame
+local ipairs = ipairs
+
+local INTERRUPT_BY_SPEC = {
+	[71] = 6552, [72] = 6552, [73] = 6552,
+	[65] = 96231, [66] = 96231, [70] = 96231,
+	[253] = 147362, [254] = 147362, [255] = 187707,
+	[259] = 1766, [260] = 1766, [261] = 1766,
+	[256] = nil, [257] = nil, [258] = 15487,
+	[250] = 47528, [251] = 47528, [252] = 47528,
+	[262] = 57994, [263] = 57994, [264] = 57994,
+	[62] = 2139, [63] = 2139, [64] = 2139,
+	[265] = 119910, [266] = 119914, [267] = 119910,
+	[268] = 116705, [269] = 116705, [270] = 116705,
+	[102] = 78675, [103] = 106839, [104] = 106839, [105] = 106839,
+	[577] = 183752, [581] = 183752, [1480] = 183752,
+	[1467] = 351338, [1468] = 351338, [1473] = 351338,
+}
+
+local interruptSpellId
+local colors
+
+local function UpdateInterruptSpell()
+	local spec = GetSpecialization()
+	if not spec then return end
+	local specId = GetSpecializationInfo(spec)
+
+	if E.myclass == 'WARLOCK' then
+		for _, spellId in ipairs({ 89766, 212619, 119914 }) do
+			if IsPlayerSpell(spellId) then
+				INTERRUPT_BY_SPEC[specId] = spellId
+				break
+			end
+		end
+	end
+
+	interruptSpellId = INTERRUPT_BY_SPEC[specId]
+end
+
+local function CacheColors()
+	local db = TUI.db.profile.nameplates
+	colors = {
+		ready = CreateColor(db.castbarInterruptReady.r, db.castbarInterruptReady.g, db.castbarInterruptReady.b),
+		onCD = CreateColor(db.castbarInterruptOnCD.r, db.castbarInterruptOnCD.g, db.castbarInterruptOnCD.b),
+		marker = db.castbarMarkerColor,
+	}
+end
+
+local function GetInterruptCooldown()
+	if interruptSpellId then return GetSpellCooldownDuration(interruptSpellId) end
+end
+
+local function PostCastFailInterrupted(castbar)
+	local c = NP.db.colors.castInterruptedColor
+	if c then castbar:SetStatusBarColor(c.r, c.g, c.b) end
+	castbar.TUI_IsInterruptedOrFailed = true
+end
+
+local function SetKickSpark(castbar, castStart, cooldown)
+	local unit = castbar.unit or castbar.__owner.unit
+	if not (unit and UnitCanAttack('player', unit)) then return end
+
+	local kickBar = castbar.TUI_KickBar
+	local indicator = kickBar.TUI_Indicator
+	if cooldown == nil then return end
+
+	if castStart then
+		local isChannel = UnitChannelInfo(unit) ~= nil
+		local fillStyle = isChannel and Enum.StatusBarFillStyle.Reverse or Enum.StatusBarFillStyle.Standard
+		local barAnchor = isChannel and 'LEFT' or 'RIGHT'
+		local indicatorAnchor = isChannel and 'RIGHT' or 'LEFT'
+
+		kickBar:SetFillStyle(fillStyle)
+		indicator:ClearAllPoints()
+		indicator:SetPoint(indicatorAnchor, kickBar:GetStatusBarTexture(), barAnchor)
+
+		local totalDuration = castbar:GetTimerDuration():GetTotalDuration()
+		kickBar:SetMinMaxValues(0, totalDuration)
+		kickBar:SetValue(cooldown:GetRemainingDuration())
+
+		local shieldAlpha = 0
+		if castbar.notInterruptible ~= nil then shieldAlpha = EvalColorBool(castbar.notInterruptible, 0, 1) end
+		kickBar:SetAlphaFromBoolean(cooldown:IsZero(), 0, shieldAlpha)
+	else
+		kickBar:SetAlphaFromBoolean(cooldown:IsZero(), 0, kickBar:GetAlpha())
+		if castbar.interrupted then kickBar:SetAlpha(0) end
+	end
+end
+
+local function SetCastbarColor(castbar, cooldown)
+	if castbar.failed or castbar.interrupted or castbar.finished or cooldown == nil then
+		local c = colors.ready
+		castbar:SetStatusBarColor(c.r, c.g, c.b)
+		return
+	end
+
+	local unit = castbar.unit or castbar.__owner.unit
+	if not (unit and UnitCanAttack('player', unit)) then return end
+
+	local ready, onCD = colors.ready, colors.onCD
+	local isReady = cooldown:IsZero()
+	local r = EvalColorBool(isReady, ready.r, onCD.r)
+	local g = EvalColorBool(isReady, ready.g, onCD.g)
+	local b = EvalColorBool(isReady, ready.b, onCD.b)
+
+	if castbar.notInterruptible ~= nil then
+		r = EvalColorBool(castbar.notInterruptible, ready.r, r)
+		g = EvalColorBool(castbar.notInterruptible, ready.g, g)
+		b = EvalColorBool(castbar.notInterruptible, ready.b, b)
+	end
+
+	castbar:SetStatusBarColor(r, g, b)
+end
+
+local function UpdateCast(castbar, castStart)
+	local cooldown = GetInterruptCooldown()
+	SetKickSpark(castbar, castStart, cooldown)
+	SetCastbarColor(castbar, cooldown)
+end
+
+local function ConstructKickBar(castbar)
+	if castbar.TUI_KickBar then return end
+
+	local kickBar = CreateFrame('StatusBar', nil, castbar)
+	kickBar:SetClipsChildren(true)
+	kickBar:SetStatusBarTexture(E.media.blankTex)
+	kickBar:GetStatusBarTexture():SetAlpha(0)
+	kickBar:ClearAllPoints()
+	kickBar:SetAllPoints(castbar)
+	kickBar:SetFrameLevel(castbar:GetFrameLevel() + 3)
+
+	local c = colors.marker
+	local indicator = kickBar:CreateTexture(nil, 'OVERLAY')
+	indicator:SetColorTexture(c.r, c.g, c.b)
+	indicator:SetSize(2, castbar:GetHeight())
+
+	kickBar.TUI_Indicator = indicator
+	castbar.TUI_KickBar = kickBar
+end
+
+local function OnUpdate(castbar, elapsed)
+	if castbar.TUI_IsInterruptedOrFailed then return end
+	castbar._kickThrottle = (castbar._kickThrottle or 0) + elapsed
+	if castbar._kickThrottle < 0.1 then return end
+	castbar._kickThrottle = 0
+	UpdateCast(castbar, false)
+end
+
+local function PostCastStart(castbar, unit)
+	if not (castbar and unit) then return end
+	if not (castbar.casting or castbar.channeling) then return end
+	if not UnitCanAttack('player', unit) then return end
+	if not interruptSpellId then return end
+
+	castbar.TUI_IsInterruptedOrFailed = false
+	ConstructKickBar(castbar)
+	UpdateCast(castbar, true)
+
+	if not castbar.TUI_OnUpdateHooked then
+		castbar:HookScript('OnUpdate', OnUpdate)
+		castbar.TUI_OnUpdateHooked = true
+	end
+end
+
+function TUI:HookCastbarInterrupt()
+	if self._hookedCastbarInterrupt then return end
+	self._hookedCastbarInterrupt = true
+
+	CacheColors()
+
+	TUI:RegisterEvent('PLAYER_ENTERING_WORLD', UpdateInterruptSpell)
+	TUI:RegisterEvent('ACTIVE_TALENT_GROUP_CHANGED', UpdateInterruptSpell)
+	TUI:RegisterEvent('PLAYER_TALENT_UPDATE', UpdateInterruptSpell)
+
+	hooksecurefunc(NP, 'Castbar_PostCastStart', PostCastStart)
+	hooksecurefunc(NP, 'Castbar_PostCastFail', PostCastFailInterrupted)
+	hooksecurefunc(NP, 'Castbar_PostCastInterrupted', PostCastFailInterrupted)
+end

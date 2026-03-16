@@ -1,0 +1,52 @@
+<Ui>
+	<!-- Skins -->
+	<Script file="skins\warpdeplete.lua"/>
+	<Script file="skins\bigwigs.lua"/>
+	<Script file="skins\auctionator.lua"/>
+	<Script file="skins\bugsack.lua"/>
+	<Script file="skins\opie.lua"/>
+	<Script file="skins\cooldownviewer.lua"/>
+
+	<!-- QoL -->
+	<Script file="qol\talkinghead.lua"/>
+	<Script file="qol\autodelete.lua"/>
+	<Script file="qol\difficultytext.lua"/>
+	<Script file="qol\fastloot.lua"/>
+	<Script file="qol\objectivetracker.lua"/>
+	<Script file="qol\moveableframes.lua"/>
+	<Script file="qol\minimapbuttons.lua"/>
+	<Script file="qol\cursorcircle.lua"/>
+
+	<!-- Nameplates -->
+	<Script file="nameplates\classtarget.lua"/>
+	<Script file="nameplates\classification.lua"/>
+	<Script file="nameplates\threat.lua"/>
+	<Script file="nameplates\interrupt.lua"/>
+	<Script file="nameplates\focusglow.lua"/>
+	<Script file="nameplates\friendlyhighlight.lua"/>
+	<Script file="nameplates\questcolor.lua"/>
+
+	<!-- Unit Frames -->
+	<Script file="unitframes\powertweaks.lua"/>
+	<Script file="unitframes\soulfragments.lua"/>
+	<Script file="unitframes\pixelglow.lua"/>
+	<Script file="unitframes\steadyflight.lua"/>
+
+	<!-- Datatexts -->
+	<Script file="datatexts\guild.lua"/>
+	<Script file="datatexts\friends.lua"/>
+
+	<!-- Damage Meter -->
+	<Script file="tdm\state.lua"/>
+	<Script file="tdm\testdata.lua"/>
+	<Script file="tdm\bars.lua"/>
+	<Script file="tdm\window.lua"/>
+	<Script file="tdm\update.lua"/>
+
+	<!-- Cooldown Manager -->
+	<Script file="cdm\state.lua"/>
+	<Script file="cdm\styling.lua"/>
+	<Script file="cdm\viewers.lua"/>
+	<Script file="cdm\layout.lua"/>
+	<Script file="cdm\init.lua"/>
+</Ui>

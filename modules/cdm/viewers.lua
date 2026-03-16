@@ -1,0 +1,358 @@
+local E = unpack(ElvUI)
+local TUI = E:GetModule('TrenchyUI')
+local S = TUI._cdm
+
+local hooksecurefunc = hooksecurefunc
+
+-- Glow Options Panel
+do
+	local AceGUI = LibStub('AceGUI-3.0')
+	local glowPanel, currentSpellID
+	local widgets = {}
+	local GLOW_TYPES = { pixel = 'Pixel', autocast = 'Autocast', button = 'Button', proc = 'Proc' }
+	local GLOW_TYPE_ORDER = { 'pixel', 'autocast', 'button', 'proc' }
+
+	local function RefreshBuffIconGlow()
+		local viewer = _G['BuffIconCooldownViewer']
+		if not viewer or not viewer.itemFramePool then return end
+		for frame in viewer.itemFramePool:EnumerateActive() do
+			if frame and frame:IsShown() and frame.GetBaseSpellID then
+				local sid = frame:GetBaseSpellID()
+				local sgdb = sid and S.GetSpellGlowDB(sid)
+				if sgdb and sgdb.enabled then
+					S.ApplyGlow(frame, sgdb, true)
+				else
+					S.StopGlow(frame)
+				end
+			end
+		end
+	end
+
+	local function UpdateVisibleSliders()
+		if not glowPanel or not currentSpellID then return end
+		local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+		if not sgdb then return end
+		local isPixel = sgdb.type == 'pixel'
+		local isAutocast = sgdb.type == 'autocast'
+		widgets.lines.frame:SetShown(isPixel)
+		widgets.thickness.frame:SetShown(isPixel)
+		widgets.particles.frame:SetShown(isAutocast)
+		widgets.scale.frame:SetShown(isAutocast)
+		glowPanel:DoLayout()
+	end
+
+	local function UpdatePanelWidgets()
+		if not glowPanel or not currentSpellID then return end
+		local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+		if not sgdb then return end
+		widgets.enable:SetValue(sgdb.enabled)
+		widgets.glowType:SetValue(sgdb.type)
+		widgets.color:SetColor(sgdb.color.r, sgdb.color.g, sgdb.color.b, sgdb.color.a or 1)
+		widgets.speed:SetValue(sgdb.speed)
+		widgets.lines:SetValue(sgdb.lines)
+		widgets.thickness:SetValue(sgdb.thickness)
+		widgets.particles:SetValue(sgdb.particles)
+		widgets.scale:SetValue(sgdb.scale)
+		UpdateVisibleSliders()
+	end
+
+	local function CreateGlowPanel()
+		local window = AceGUI:Create('Window')
+		window:SetTitle('|cffff2f3dTrenchyUI|r Glow Options')
+		window:SetWidth(300)
+		window:SetHeight(340)
+		window:SetLayout('Flow')
+		window:EnableResize(false)
+		window.frame:SetFrameStrata('DIALOG')
+
+		local enable = AceGUI:Create('CheckBox')
+		enable:SetLabel('Enable Glow')
+		enable:SetFullWidth(true)
+		enable:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.enabled = val; RefreshBuffIconGlow() end
+		end)
+		window:AddChild(enable)
+		widgets.enable = enable
+
+		local glowType = AceGUI:Create('Dropdown')
+		glowType:SetLabel('Type')
+		glowType:SetList(GLOW_TYPES, GLOW_TYPE_ORDER)
+		glowType:SetRelativeWidth(0.5)
+		glowType:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.type = val; UpdateVisibleSliders(); RefreshBuffIconGlow() end
+		end)
+		window:AddChild(glowType)
+		widgets.glowType = glowType
+
+		local color = AceGUI:Create('ColorPicker')
+		color:SetLabel('Color')
+		color:SetRelativeWidth(0.5)
+		color:SetHasAlpha(true)
+
+		local function colorChanged(_, _, r, g, b, a)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.color.r, sgdb.color.g, sgdb.color.b, sgdb.color.a = r, g, b, a; RefreshBuffIconGlow() end
+		end
+		color:SetCallback('OnValueChanged', colorChanged)
+		color:SetCallback('OnValueConfirmed', colorChanged)
+
+		window:AddChild(color)
+		widgets.color = color
+
+		local speed = AceGUI:Create('Slider')
+		speed:SetLabel('Speed')
+		speed:SetSliderValues(0.05, 2, 0.05)
+		speed:SetFullWidth(true)
+		speed:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.speed = val; RefreshBuffIconGlow() end
+		end)
+		window:AddChild(speed)
+		widgets.speed = speed
+
+		local lines = AceGUI:Create('Slider')
+		lines:SetLabel('Lines')
+		lines:SetSliderValues(1, 20, 1)
+		lines:SetFullWidth(true)
+		lines:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.lines = val; RefreshBuffIconGlow() end
+		end)
+		window:AddChild(lines)
+		widgets.lines = lines
+
+		local thickness = AceGUI:Create('Slider')
+		thickness:SetLabel('Thickness')
+		thickness:SetSliderValues(1, 8, 1)
+		thickness:SetFullWidth(true)
+		thickness:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.thickness = val; RefreshBuffIconGlow() end
+		end)
+		window:AddChild(thickness)
+		widgets.thickness = thickness
+
+		local particles = AceGUI:Create('Slider')
+		particles:SetLabel('Particles')
+		particles:SetSliderValues(1, 16, 1)
+		particles:SetFullWidth(true)
+		particles:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.particles = val; RefreshBuffIconGlow() end
+		end)
+		window:AddChild(particles)
+		widgets.particles = particles
+
+		local scale = AceGUI:Create('Slider')
+		scale:SetLabel('Scale')
+		scale:SetSliderValues(0.5, 3, 0.1)
+		scale:SetFullWidth(true)
+		scale:SetCallback('OnValueChanged', function(_, _, val)
+			local sgdb = S.GetOrCreateSpellGlowDB(currentSpellID)
+			if sgdb then sgdb.scale = val; RefreshBuffIconGlow() end
+		end)
+		window:AddChild(scale)
+		widgets.scale = scale
+
+		window:SetCallback('OnClose', function() glowPanel = nil end)
+		window:Hide()
+		glowPanel = window
+	end
+
+	function TUI:HideGlowPanel()
+		if glowPanel then glowPanel:Hide() end
+	end
+
+	function TUI:ShowGlowPanel(spellID)
+		if not glowPanel then CreateGlowPanel() end
+		currentSpellID = spellID
+		TUI:HideBarColorPanel()
+
+		local spellInfo = C_Spell.GetSpellInfo(spellID)
+		local name = spellInfo and spellInfo.name or ('Spell ' .. spellID)
+		glowPanel:SetTitle('|cffff2f3dTrenchyUI|r ' .. name)
+
+		-- Anchor to Cooldown Settings panel
+		glowPanel.frame:ClearAllPoints()
+		local tsf = _G.CooldownViewerSettings
+		if tsf and tsf:IsShown() then
+			glowPanel.frame:SetPoint('TOPLEFT', tsf, 'TOPRIGHT', 50, 0)
+		else
+			glowPanel.frame:SetPoint('CENTER', E.UIParent, 'CENTER', 0, 100)
+		end
+
+		-- Close glow panel when Cooldown Settings closes or Edit Alert opens
+		if tsf and not tsf.tuiGlowHooked then
+			tsf:HookScript('OnHide', function() if glowPanel then glowPanel:Hide() end end)
+			tsf.tuiGlowHooked = true
+		end
+
+		local editAlert = _G.CooldownViewerSettingsEditAlert
+		if editAlert then
+			if not editAlert.tuiGlowHooked then
+				editAlert:HookScript('OnShow', function() if glowPanel then glowPanel:Hide() end end)
+				editAlert.tuiGlowHooked = true
+			end
+			if editAlert:IsShown() then editAlert:Hide() end
+		end
+
+		UpdatePanelWidgets()
+		glowPanel:Show()
+	end
+end
+
+-- Bar Color Options Panel
+do
+	local AceGUI = LibStub('AceGUI-3.0')
+	local barColorPanel, barColorSpellID
+	local bcWidgets = {}
+
+	local function RefreshBuffBarColors()
+		local viewer = _G['BuffBarCooldownViewer']
+		if not viewer or not viewer.itemFramePool then return end
+		local vdb = S.GetViewerDB('buffBar')
+		if not vdb then return end
+		for frame in viewer.itemFramePool:EnumerateActive() do
+			if frame and frame:IsShown() then
+				S.ApplyBarStyle(frame, vdb)
+			end
+		end
+	end
+
+	local function UpdateBarColorWidgets()
+		if not barColorPanel or not barColorSpellID then return end
+		local sbc = S.GetOrCreateSpellBarColorDB(barColorSpellID)
+		if not sbc then return end
+		bcWidgets.enable:SetValue(sbc.enabled)
+		bcWidgets.fgColor:SetColor(sbc.fgColor.r, sbc.fgColor.g, sbc.fgColor.b)
+		bcWidgets.bgColor:SetColor(sbc.bgColor.r, sbc.bgColor.g, sbc.bgColor.b, sbc.bgColor.a or 0.5)
+	end
+
+	local function CreateBarColorPanel()
+		local window = AceGUI:Create('Window')
+		window:SetTitle('|cffff2f3dTrenchyUI|r Bar Colors')
+		window:SetWidth(280)
+		window:SetHeight(180)
+		window:SetLayout('Flow')
+		window:EnableResize(false)
+		window.frame:SetFrameStrata('DIALOG')
+
+		local enable = AceGUI:Create('CheckBox')
+		enable:SetLabel('Enable Custom Colors')
+		enable:SetFullWidth(true)
+		enable:SetCallback('OnValueChanged', function(_, _, val)
+			local sbc = S.GetOrCreateSpellBarColorDB(barColorSpellID)
+			if sbc then sbc.enabled = val; RefreshBuffBarColors() end
+		end)
+		window:AddChild(enable)
+		bcWidgets.enable = enable
+
+		local fgColor = AceGUI:Create('ColorPicker')
+		fgColor:SetLabel('Foreground')
+		fgColor:SetRelativeWidth(0.5)
+		fgColor:SetHasAlpha(false)
+		local function fgChanged(_, _, r, g, b)
+			local sbc = S.GetOrCreateSpellBarColorDB(barColorSpellID)
+			if sbc then sbc.fgColor.r, sbc.fgColor.g, sbc.fgColor.b = r, g, b; RefreshBuffBarColors() end
+		end
+		fgColor:SetCallback('OnValueChanged', fgChanged)
+		fgColor:SetCallback('OnValueConfirmed', fgChanged)
+		window:AddChild(fgColor)
+		bcWidgets.fgColor = fgColor
+
+		local bgColor = AceGUI:Create('ColorPicker')
+		bgColor:SetLabel('Background')
+		bgColor:SetRelativeWidth(0.5)
+		bgColor:SetHasAlpha(true)
+		local function bgChanged(_, _, r, g, b, a)
+			local sbc = S.GetOrCreateSpellBarColorDB(barColorSpellID)
+			if sbc then sbc.bgColor.r, sbc.bgColor.g, sbc.bgColor.b, sbc.bgColor.a = r, g, b, a; RefreshBuffBarColors() end
+		end
+		bgColor:SetCallback('OnValueChanged', bgChanged)
+		bgColor:SetCallback('OnValueConfirmed', bgChanged)
+		window:AddChild(bgColor)
+		bcWidgets.bgColor = bgColor
+
+		window:SetCallback('OnClose', function() barColorPanel = nil end)
+		window:Hide()
+		barColorPanel = window
+	end
+
+	function TUI:HideBarColorPanel()
+		if barColorPanel then barColorPanel:Hide() end
+	end
+
+	function TUI:ShowBarColorPanel(spellID)
+		if not barColorPanel then CreateBarColorPanel() end
+		barColorSpellID = spellID
+		TUI:HideGlowPanel()
+
+		local spellInfo = C_Spell.GetSpellInfo(spellID)
+		local name = spellInfo and spellInfo.name or ('Spell ' .. spellID)
+		barColorPanel:SetTitle('|cffff2f3dTrenchyUI|r ' .. name)
+
+		barColorPanel.frame:ClearAllPoints()
+		local tsf = _G.CooldownViewerSettings
+		if tsf and tsf:IsShown() then
+			barColorPanel.frame:SetPoint('TOPLEFT', tsf, 'TOPRIGHT', 50, 0)
+		else
+			barColorPanel.frame:SetPoint('CENTER', E.UIParent, 'CENTER', 0, 100)
+		end
+
+		if tsf and not tsf.tuiBarColorHooked then
+			tsf:HookScript('OnHide', function() if barColorPanel then barColorPanel:Hide() end end)
+			tsf.tuiBarColorHooked = true
+		end
+
+		local editAlert = _G.CooldownViewerSettingsEditAlert
+		if editAlert then
+			if not editAlert.tuiBarColorHooked then
+				editAlert:HookScript('OnShow', function() if barColorPanel then barColorPanel:Hide() end end)
+				editAlert.tuiBarColorHooked = true
+			end
+			if editAlert:IsShown() then editAlert:Hide() end
+		end
+
+		UpdateBarColorWidgets()
+		barColorPanel:Show()
+	end
+end
+
+-- Blizzard CDM settings
+function S.ShowBlizzardCDMSettings()
+	if not C_AddOns.IsAddOnLoaded('Blizzard_CooldownViewer') then
+		C_AddOns.LoadAddOn('Blizzard_CooldownViewer')
+	end
+	local settings = _G.CooldownViewerSettings
+	if settings and not settings:IsShown() then
+		settings:Show()
+	end
+	S.ScheduleRelayout()
+end
+
+function S.HideBlizzardCDMSettings()
+	local settings = _G.CooldownViewerSettings
+	if settings and settings:IsShown() then
+		settings:Hide()
+	end
+	S.ScheduleRelayout()
+end
+
+function S.IsConfigOpen()
+	local ACD = E.Libs.AceConfigDialog
+	return ACD and ACD.OpenFrames and ACD.OpenFrames.ElvUI
+end
+
+function S.OpenCDMConfig()
+	if not S.IsConfigOpen() then
+		E:ToggleOptions('TrenchyUI')
+	end
+	C_Timer.After(0.1, function()
+		local configGroup = E.Options and E.Options.args and E.Options.args.TrenchyUI
+		if configGroup and configGroup.args and configGroup.args.cooldownManager then
+			E.Libs.AceConfigDialog:SelectGroup('ElvUI', 'TrenchyUI', 'cooldownManager')
+		end
+	end)
+end

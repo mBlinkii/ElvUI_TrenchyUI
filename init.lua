@@ -1,0 +1,56 @@
+local E = unpack(ElvUI)
+local TUI = E:GetModule('TrenchyUI')
+
+function TUI:InitModules()
+	-- Skins
+	if self.InitSkinWarpDeplete then self:InitSkinWarpDeplete() end
+	if self.InitSkinBigWigs then self:InitSkinBigWigs() end
+	if self.InitSkinAuctionator then self:InitSkinAuctionator() end
+	if self.InitSkinBugSack then self:InitSkinBugSack() end
+	if self.InitSkinOPie then self:InitSkinOPie() end
+
+	-- QoL
+	local db = self.db.profile.qol
+	if db.hideTalkingHead then self:InitHideTalkingHead() end
+	if db.autoFillDelete then self:InitAutoFillDelete() end
+	if db.difficultyText then self:InitDifficultyText() end
+	if db.fastLoot then self:InitFastLoot() end
+	if db.moveableFrames and not self:IsCompatBlocked('moveableFrames') then self:InitMoveableFrames() end
+	if db.hideObjectiveInCombat then self:InitHideObjectiveInCombat() end
+	if self.InitMinimapButtonBar then self:InitMinimapButtonBar() end
+	if db.cursorCircle then self:InitCursorCircle() end
+
+	-- Nameplates
+	local np = self.db.profile.nameplates
+	if np then
+		-- Pending removal based on ElvUI updates
+		if np.hideFriendlyRealm
+			and NamePlateFriendlyFrameOptions and TextureLoadingGroupMixin
+			and NamePlateFriendlyFrameOptions.updateNameUsesGetUnitName then
+			local wrapper = { textures = NamePlateFriendlyFrameOptions }
+			NamePlateFriendlyFrameOptions.updateNameUsesGetUnitName = 0
+			TextureLoadingGroupMixin.RemoveTexture(wrapper, 'updateNameUsesGetUnitName')
+		end
+		-- Override target indicator color with player's class color
+		self:HookClassColorTargetIndicator()
+		if np.classificationInstanceOnly then self:HookClassificationInstanceOnly() end
+		-- Pending removal based on ElvUI updates
+		if np.classificationOverThreat then self:HookNameplateThreat() end
+		if np.interruptCastbarColors then self:HookCastbarInterrupt() end
+		-- Pending removal based on ElvUI updates
+		if np.focusGlow and np.focusGlow.enabled then self:InitFocusGlow() end
+		if np.disableFriendlyHighlight then self:HookDisableFriendlyHighlight() end
+		if np.questColor and np.questColor.enabled then self:HookQuestColor() end
+	end
+
+	-- Unit Frames
+	if self.db.profile.fakePower.soulFragments and self.InitSoulFragments then self:InitSoulFragments() end
+	if not self:IsCompatBlocked('auraHighlight') and self.InitPixelGlow then self:InitPixelGlow() end
+	if self.InitSteadyFlight then self:InitSteadyFlight() end
+
+	-- Cooldown Manager
+	if not self:IsCompatBlocked('cooldownManager') and self.InitCooldownManager then self:InitCooldownManager() end
+
+	-- Damage Meter
+	if not self:IsCompatBlocked('damageMeter') and self.InitDamageMeter then self:InitDamageMeter() end
+end
