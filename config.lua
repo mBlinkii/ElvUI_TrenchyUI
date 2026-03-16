@@ -1293,11 +1293,10 @@ function TUI:BuildConfig()
             function(_, value)
                 selVDB().hideWhenInactive = value
                 local v = cdmDB().selectedViewer
-                if (v == 'buffIcon' or v == 'buffBar') and TUI.SetEditModeHWI then
-                    TUI:SetEditModeHWI(v, value)
+                if (v == 'buffIcon' or v == 'buffBar') and TUI.SetEditModeSetting and Enum.EditModeCooldownViewerSetting then
+                    TUI:SetEditModeSetting(v, Enum.EditModeCooldownViewerSetting.HideWhenInactive, value and 1 or 0)
                 end
-                if TUI.UpdateCDMVisibility then TUI:UpdateCDMVisibility() end
-                cdmRefresh()
+                E:StaticPopup_Show('CONFIG_RL')
             end
         )
         cdmLayout.hideWhenInactive.hidden = function()
@@ -1314,6 +1313,7 @@ function TUI:BuildConfig()
                 if TUI.SetEditModeSetting and Enum.EditModeCooldownViewerSetting then
                     TUI:SetEditModeSetting(v, Enum.EditModeCooldownViewerSetting.ShowTooltips, value and 1 or 0)
                 end
+                E:StaticPopup_Show('CONFIG_RL')
             end
         )
 
