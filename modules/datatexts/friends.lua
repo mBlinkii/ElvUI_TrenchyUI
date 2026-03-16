@@ -459,8 +459,9 @@ local function ShowTooltip(panel)
 					row.name:SetText(nameStr)
 					row.name:SetTextColor(classc.r, classc.g, classc.b)
 
-					row.zone:SetText(info.accountName or '')
-					row.zone:SetTextColor(0.93, 0.93, 0.93)
+					local zonec = (E.MapInfo.zoneText and E.MapInfo.zoneText == info.zone) and activezone or inactivezone
+					row.zone:SetText(info.zone)
+					row.zone:SetTextColor(zonec.r, zonec.g, zonec.b)
 				else
 					row.level:SetText('')
 					local nameStr = info.name ~= '' and (info.name .. info.status) or ''
