@@ -1251,16 +1251,18 @@ local function HookViewer(viewerKey)
 	end
 end
 
--- Edit Mode HWI — read/write HideWhenInactive for CDM viewers via C_EditMode
-local function FindViewerHWISettings(systemIndex)
+-- Edit Mode settings — read/write CDM viewer settings via C_EditMode
+local CDV_SETTING = Enum and Enum.EditModeCooldownViewerSetting
+local CDV_INDICES = Enum and Enum.EditModeCooldownViewerSystemIndices
+
+local function FindViewerSettings(systemIndex)
 	if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts) then return end
 	local enums = Enum and Enum.EditModeSystem
-	if not (enums and enums.CooldownViewer and Enum.EditModeCooldownViewerSystemIndices and Enum.EditModeCooldownViewerSetting) then return end
+	if not (enums and enums.CooldownViewer and CDV_INDICES and CDV_SETTING) then return end
 
 	local layoutInfo = C_EditMode.GetLayouts()
 	if type(layoutInfo) ~= 'table' or type(layoutInfo.layouts) ~= 'table' or type(layoutInfo.activeLayout) ~= 'number' then return end
 
-	-- Preset layouts must be merged so activeLayout index resolves
 	if EditModePresetLayoutManager and EditModePresetLayoutManager.GetCopyOfPresetLayouts then
 		local presets = EditModePresetLayoutManager:GetCopyOfPresetLayouts()
 		if type(presets) == 'table' then
@@ -1281,41 +1283,60 @@ local function FindViewerHWISettings(systemIndex)
 	end
 end
 
-local VIEWER_SYSTEM_INDEX = {
-	buffIcon = Enum.EditModeCooldownViewerSystemIndices and Enum.EditModeCooldownViewerSystemIndices.BuffIcon,
-	buffBar = Enum.EditModeCooldownViewerSystemIndices and Enum.EditModeCooldownViewerSystemIndices.BuffBar,
+local VIEWER_SYSTEM_INDEX = CDV_INDICES and {
+	essential = CDV_INDICES.Essential,
+	utility   = CDV_INDICES.Utility,
+	buffIcon  = CDV_INDICES.BuffIcon,
+	buffBar   = CDV_INDICES.BuffBar,
 }
 
-function TUI:GetEditModeHWI(viewerKey)
-	local sysIdx = VIEWER_SYSTEM_INDEX[viewerKey]
+-- Read a single Edit Mode setting for a viewer (returns number or nil)
+function TUI:GetEditModeSetting(viewerKey, settingEnum)
+	local sysIdx = VIEWER_SYSTEM_INDEX and VIEWER_SYSTEM_INDEX[viewerKey]
 	if not sysIdx then return nil end
-	local settings = FindViewerHWISettings(sysIdx)
+	local settings = FindViewerSettings(sysIdx)
 	if not settings then return nil end
-	local hwi = Enum.EditModeCooldownViewerSetting.HideWhenInactive
 	for _, s in ipairs(settings) do
-		if s.setting == hwi then return s.value == 1 end
+		if s.setting == settingEnum then return s.value end
 	end
-	return false
+	return nil
+end
+
+-- Write a single Edit Mode setting and apply it live via UpdateSystemSettingValue
+function TUI:SetEditModeSetting(viewerKey, settingEnum, value)
+	local sysIdx = VIEWER_SYSTEM_INDEX and VIEWER_SYSTEM_INDEX[viewerKey]
+	if not sysIdx then return end
+	local settings, layoutInfo = FindViewerSettings(sysIdx)
+	if not settings then return end
+	local found = false
+	for _, s in ipairs(settings) do
+		if s.setting == settingEnum then
+			if s.value == value then return end
+			s.value = value
+			found = true
+			break
+		end
+	end
+	if not found then
+		settings[#settings + 1] = { setting = settingEnum, value = value }
+	end
+	C_EditMode.SaveLayouts(layoutInfo)
+	local viewer = GetViewer(viewerKey)
+	if viewer and viewer.UpdateSystemSettingValue then
+		viewer:UpdateSystemSettingValue(settingEnum, value)
+	end
+end
+
+-- Convenience wrappers for HWI (buffIcon only)
+function TUI:GetEditModeHWI(viewerKey)
+	if not CDV_SETTING then return nil end
+	local val = self:GetEditModeSetting(viewerKey, CDV_SETTING.HideWhenInactive)
+	return val and val == 1
 end
 
 function TUI:SetEditModeHWI(viewerKey, enabled)
-	local sysIdx = VIEWER_SYSTEM_INDEX[viewerKey]
-	if not sysIdx then return 'not_ready' end
-	local settings, layoutInfo = FindViewerHWISettings(sysIdx)
-	if not settings then return 'not_ready' end
-	local hwi = Enum.EditModeCooldownViewerSetting.HideWhenInactive
-	local val = enabled and 1 or 0
-	for _, s in ipairs(settings) do
-		if s.setting == hwi then
-			if s.value == val then return 'noop' end
-			s.value = val
-			C_EditMode.SaveLayouts(layoutInfo)
-			return 'applied'
-		end
-	end
-	settings[#settings + 1] = { setting = hwi, value = val }
-	C_EditMode.SaveLayouts(layoutInfo)
-	return 'applied'
+	if not CDV_SETTING then return end
+	self:SetEditModeSetting(viewerKey, CDV_SETTING.HideWhenInactive, enabled and 1 or 0)
 end
 
 ShouldShowContainer = function(viewerKey)
@@ -1392,12 +1413,17 @@ function TUI:InitCooldownManager()
 		end
 	end
 
-	-- Sync our DB to reflect Blizzard's current Edit Mode HWI state
-	for _, vk in ipairs({'buffIcon', 'buffBar'}) do
+	-- Sync our DB to reflect Blizzard's current Edit Mode state
+	for vk in pairs(VIEWER_KEYS) do
 		local vdb = GetViewerDB(vk)
-		local blizzHWI = self:GetEditModeHWI(vk)
-		if vdb and blizzHWI ~= nil then
-			vdb.hideWhenInactive = blizzHWI
+		if not vdb then break end
+		if CDV_SETTING then
+			local tooltipVal = self:GetEditModeSetting(vk, CDV_SETTING.ShowTooltips)
+			if tooltipVal ~= nil then vdb.showTooltips = tooltipVal == 1 end
+		end
+		if vk == 'buffIcon' then
+			local blizzHWI = self:GetEditModeHWI(vk)
+			if blizzHWI ~= nil then vdb.hideWhenInactive = blizzHWI end
 		end
 	end
 

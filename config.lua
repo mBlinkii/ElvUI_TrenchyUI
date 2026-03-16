@@ -79,28 +79,28 @@ TUI.defaults = {
             selectedViewer = 'essential',
             viewers = {
                 essential = {
-                    visibleSetting = 'ALWAYS',
+                    visibleSetting = 'ALWAYS', showTooltips = false,
                     keepSizeRatio = true, iconWidth = 30, iconHeight = 30, iconZoom = 0, spacing = 2, iconsPerRow = 12, growthDirection = 'DOWN',
                     cooldownText = { font = 'Expressway', fontSize = 16, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'CENTER', xOffset = 0, yOffset = 0 },
                     countText    = { font = 'Expressway', fontSize = 11, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'BOTTOMRIGHT', xOffset = 0, yOffset = 0 },
                     glow = { enabled = false, type = 'pixel', color = { r = 0.95, g = 0.95, b = 0.32, a = 1 }, lines = 8, speed = 0.25, thickness = 2, length = nil, particles = 4, scale = 1, startAnim = true },
                 },
                 utility = {
-                    visibleSetting = 'ALWAYS',
+                    visibleSetting = 'ALWAYS', showTooltips = false,
                     keepSizeRatio = true, iconWidth = 30, iconHeight = 30, iconZoom = 0, spacing = 2, iconsPerRow = 12, growthDirection = 'DOWN',
                     cooldownText = { font = 'Expressway', fontSize = 16, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'CENTER', xOffset = 0, yOffset = 0 },
                     countText    = { font = 'Expressway', fontSize = 11, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'BOTTOMRIGHT', xOffset = 0, yOffset = 0 },
                     glow = { enabled = false, type = 'pixel', color = { r = 0.95, g = 0.95, b = 0.32, a = 1 }, lines = 8, speed = 0.25, thickness = 2, length = nil, particles = 4, scale = 1, startAnim = true },
                 },
                 buffIcon = {
-                    visibleSetting = 'ALWAYS', hideWhenInactive = false,
+                    visibleSetting = 'ALWAYS', hideWhenInactive = false, showTooltips = false,
                     keepSizeRatio = true, iconWidth = 30, iconHeight = 30, iconZoom = 0, spacing = 2, iconsPerRow = 12, growthDirection = 'DOWN',
                     cooldownText = { font = 'Expressway', fontSize = 16, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'CENTER', xOffset = 0, yOffset = 0 },
                     countText    = { font = 'Expressway', fontSize = 11, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'BOTTOMRIGHT', xOffset = 0, yOffset = 0 },
                     glow = { enabled = false, type = 'pixel', color = { r = 0.95, g = 0.95, b = 0.32, a = 1 }, lines = 8, speed = 0.25, thickness = 2, length = nil, particles = 4, scale = 1, startAnim = true },
                 },
                 buffBar = {
-                    visibleSetting = 'ALWAYS', hideWhenInactive = true, barWidth = 200, barHeight = 20, spacing = 2, growthDirection = 'DOWN',
+                    visibleSetting = 'ALWAYS', hideWhenInactive = true, showTooltips = false, barWidth = 200, barHeight = 20, spacing = 2, growthDirection = 'DOWN',
                     showIcon = true, showName = true, showTimer = true, showSpark = false, iconGap = 2, mirroredColumns = false, columnGap = 4,
                     foregroundTexture = 'ElvUI Norm', backgroundTexture = 'ElvUI Norm',
                     nameText     = { font = 'Expressway', fontSize = 12, fontOutline = 'OUTLINE', classColor = false, color = { r = 1, g = 1, b = 1 }, position = 'LEFT', xOffset = 2, yOffset = 0 },
@@ -1287,22 +1287,14 @@ function TUI:BuildConfig()
 
         cdmLayout.hideWhenInactive = ACH:Toggle(
             "Hide When Inactive",
-            function()
-                local v = cdmDB().selectedViewer
-                if v == 'buffIcon' then return "Hide when no buff icons are active. Requires a UI reload."
-                elseif v == 'buffBar' then return "Hide when no buff bars are active. Requires a UI reload."
-                end
-            end,
+            "Hide when no buff icons are active.",
             12, nil, nil, nil,
             function() return selVDB().hideWhenInactive end,
             function(_, value)
                 selVDB().hideWhenInactive = value
                 local v = cdmDB().selectedViewer
                 if (v == 'buffIcon' or v == 'buffBar') and TUI.SetEditModeHWI then
-                    local result = TUI:SetEditModeHWI(v, value)
-                    if result == 'applied' then
-                        E:StaticPopup_Show('CONFIG_RL')
-                    end
+                    TUI:SetEditModeHWI(v, value)
                 end
                 if TUI.UpdateCDMVisibility then TUI:UpdateCDMVisibility() end
                 cdmRefresh()
@@ -1310,8 +1302,20 @@ function TUI:BuildConfig()
         )
         cdmLayout.hideWhenInactive.hidden = function()
             local v = cdmDB().selectedViewer
-            return v ~= 'buffIcon' and v ~= 'buffBar'
+            return v ~= 'buffIcon'
         end
+
+        cdmLayout.showTooltips = ACH:Toggle(
+            "Show Tooltips", "Show spell tooltips when hovering over icons or bars.", 13, nil, nil, nil,
+            function() return selVDB().showTooltips end,
+            function(_, value)
+                selVDB().showTooltips = value
+                local v = cdmDB().selectedViewer
+                if TUI.SetEditModeSetting and Enum.EditModeCooldownViewerSetting then
+                    TUI:SetEditModeSetting(v, Enum.EditModeCooldownViewerSetting.ShowTooltips, value and 1 or 0)
+                end
+            end
+        )
 
         -- Cooldown Text group (icon viewers only)
         cdmViewer.cooldownText = ACH:Group("Cooldown Text", nil, 4)
