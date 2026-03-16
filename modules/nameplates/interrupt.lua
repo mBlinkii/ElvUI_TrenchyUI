@@ -5,6 +5,7 @@ local NP = E:GetModule('NamePlates')
 
 local GetSpellCooldownDuration = C_Spell.GetSpellCooldownDuration
 local EvalColorBool = C_CurveUtil.EvaluateColorValueFromBoolean
+local EvalColor = C_CurveUtil.EvaluateColorFromBoolean
 local UnitCanAttack = UnitCanAttack
 local UnitChannelInfo = UnitChannelInfo
 local GetSpecialization = GetSpecialization
@@ -51,9 +52,11 @@ end
 
 local function CacheColors()
 	local db = TUI.db.profile.nameplates
+	local ni = NP.db.colors.castNoInterruptColor
 	colors = {
 		ready = CreateColor(db.castbarInterruptReady.r, db.castbarInterruptReady.g, db.castbarInterruptReady.b),
 		onCD = CreateColor(db.castbarInterruptOnCD.r, db.castbarInterruptOnCD.g, db.castbarInterruptOnCD.b),
+		noInterrupt = CreateColor(ni.r, ni.g, ni.b),
 		marker = db.castbarMarkerColor,
 	}
 end
@@ -103,19 +106,14 @@ local function SetCastbarColor(castbar, cooldown)
 	local unit = castbar.unit or castbar.__owner.unit
 	if not (unit and UnitCanAttack('player', unit)) then return end
 
-	local ready, onCD = colors.ready, colors.onCD
-	local isReady = cooldown:IsZero()
-	local r = EvalColorBool(isReady, ready.r, onCD.r)
-	local g = EvalColorBool(isReady, ready.g, onCD.g)
-	local b = EvalColorBool(isReady, ready.b, onCD.b)
+	local color = EvalColor(cooldown:IsZero(), colors.ready, colors.onCD)
 
+	-- Shielded casts: defer to ElvUI's castNoInterruptColor
 	if castbar.notInterruptible ~= nil then
-		r = EvalColorBool(castbar.notInterruptible, ready.r, r)
-		g = EvalColorBool(castbar.notInterruptible, ready.g, g)
-		b = EvalColorBool(castbar.notInterruptible, ready.b, b)
+		color = EvalColor(castbar.notInterruptible, colors.noInterrupt, color)
 	end
 
-	castbar:SetStatusBarColor(r, g, b)
+	castbar:SetStatusBarColor(color:GetRGBA())
 end
 
 local function UpdateCast(castbar, castStart)
