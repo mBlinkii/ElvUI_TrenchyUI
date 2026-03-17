@@ -4,7 +4,7 @@ local TUI = E:GetModule('TrenchyUI')
 local LSM = E.Libs.LSM
 local CreateFrame = CreateFrame
 local ipairs = ipairs
-local select, tonumber, GetInstanceInfo = select, tonumber, GetInstanceInfo
+local tonumber, GetInstanceInfo = tonumber, GetInstanceInfo
 
 local DIFF_CATEGORY = {
 	[1]   = 'normal',  [14]  = 'normal',  [38]  = 'normal',
@@ -35,6 +35,10 @@ local DIFF_LABEL = {
 	delve       = 'D',
 	other       = '?',
 }
+
+local fallbackWhite = { r = 1, g = 1, b = 1 }
+local fallbackKeystone = { r = 1, g = 0.5, b = 0 }
+local fallbackDelve = { r = 0.8, g = 0.6, b = 0.2 }
 
 local diffTextFrame, diffFontString, diffLevelString
 
@@ -94,16 +98,16 @@ local function UpdateDifficultyText()
 	local colors = db.difficultyColors or {}
 	local category = DIFF_CATEGORY[difficultyID] or 'other'
 	local label = DIFF_LABEL[category] or '?'
-	local c = colors[category] or colors.other or { r = 1, g = 1, b = 1 }
+	local c = colors[category] or colors.other or fallbackWhite
 
 	diffFontString:SetText(label)
 	diffFontString:SetTextColor(c.r, c.g, c.b, 1)
 
 	if category == 'keystoneMod' then
 		local level = C_ChallengeMode.IsChallengeModeActive()
-			and select(1, C_ChallengeMode.GetActiveKeystoneInfo())
+			and C_ChallengeMode.GetActiveKeystoneInfo()
 		if level and level > 0 then
-			local kc = colors.keystoneMod or { r = 1, g = 0.5, b = 0 }
+			local kc = colors.keystoneMod or fallbackKeystone
 			diffLevelString:SetText(level)
 			diffLevelString:SetTextColor(kc.r, kc.g, kc.b, 1)
 			diffLevelString:Show()
@@ -116,7 +120,7 @@ local function UpdateDifficultyText()
 			and C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo(6183)
 		local tier = info and tonumber(info.tierText)
 		if tier and tier > 0 then
-			local dc = colors.delve or { r = 0.8, g = 0.6, b = 0.2 }
+			local dc = colors.delve or fallbackDelve
 			diffLevelString:SetText(tier)
 			diffLevelString:SetTextColor(dc.r, dc.g, dc.b, 1)
 			diffLevelString:Show()

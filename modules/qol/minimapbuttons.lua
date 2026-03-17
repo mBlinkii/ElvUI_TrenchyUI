@@ -11,6 +11,8 @@ local mbbInCombat = false
 local mbbSkinned = {}
 
 local MBB_PADDING = 4
+local backdropInsets = { left = 0, right = 0, top = 0, bottom = 0 }
+local backdropTable = { insets = backdropInsets }
 
 local function GetMBBDB()
 	return TUI.db.profile.minimapButtonBar
@@ -79,12 +81,10 @@ local function SkinButton(btn, size)
 	bd:SetPoint('BOTTOMRIGHT', btn, 'BOTTOMRIGHT', bSize, -bSize)
 
 	if db.buttonBackdrop or db.buttonBorder then
-		bd:SetBackdrop({
-			bgFile   = db.buttonBackdrop and E.media.blankTex or nil,
-			edgeFile = db.buttonBorder and E.media.blankTex or nil,
-			edgeSize = db.buttonBorder and bSize or 0,
-			insets   = { left = 0, right = 0, top = 0, bottom = 0 },
-		})
+		backdropTable.bgFile = db.buttonBackdrop and E.media.blankTex or nil
+		backdropTable.edgeFile = db.buttonBorder and E.media.blankTex or nil
+		backdropTable.edgeSize = db.buttonBorder and bSize or 0
+		bd:SetBackdrop(backdropTable)
 		if db.buttonBackdrop then
 			local c = db.buttonBackdropColor
 			bd:SetBackdropColor(c.r, c.g, c.b, c.a)
@@ -201,12 +201,10 @@ local function UpdateBarStyle()
 
 	if db.backdrop or db.border then
 		local bSize = db.borderSize or 1
-		mbbBar:SetBackdrop({
-			bgFile   = db.backdrop and E.media.blankTex or nil,
-			edgeFile = db.border and E.media.blankTex or nil,
-			edgeSize = db.border and bSize or 0,
-			insets   = { left = 0, right = 0, top = 0, bottom = 0 },
-		})
+		backdropTable.bgFile = db.backdrop and E.media.blankTex or nil
+		backdropTable.edgeFile = db.border and E.media.blankTex or nil
+		backdropTable.edgeSize = db.border and bSize or 0
+		mbbBar:SetBackdrop(backdropTable)
 		if db.backdrop then
 			local bc = db.backdropColor
 			mbbBar:SetBackdropColor(bc.r, bc.g, bc.b, bc.a)

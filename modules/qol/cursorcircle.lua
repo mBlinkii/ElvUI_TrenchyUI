@@ -33,9 +33,12 @@ function TUI:InitCursorCircle()
 	circleTexture:SetTexture(TEXTURE_PATH .. (db.cursorCircleThickness or 'medium'))
 	ApplyCircleColor()
 
+	local lastX, lastY = 0, 0
 	circleFrame:SetScript('OnUpdate', function(frame)
-		frame:ClearAllPoints()
 		local cx, cy = GetCursorPosition()
+		if cx == lastX and cy == lastY then return end
+		lastX, lastY = cx, cy
+		frame:ClearAllPoints()
 		local scale = UIParent:GetEffectiveScale()
 		frame:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cx / scale, cy / scale)
 	end)
