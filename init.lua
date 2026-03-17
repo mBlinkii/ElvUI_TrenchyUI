@@ -23,14 +23,7 @@ function TUI:InitModules()
 	-- Nameplates
 	local np = self.db.profile.nameplates
 	if np then
-		-- Pending removal based on ElvUI updates
-		if np.hideFriendlyRealm
-			and NamePlateFriendlyFrameOptions and TextureLoadingGroupMixin
-			and NamePlateFriendlyFrameOptions.updateNameUsesGetUnitName then
-			local wrapper = { textures = NamePlateFriendlyFrameOptions }
-			NamePlateFriendlyFrameOptions.updateNameUsesGetUnitName = 0
-			TextureLoadingGroupMixin.RemoveTexture(wrapper, 'updateNameUsesGetUnitName')
-		end
+		if np.hideFriendlyRealm then self:InitHideFriendlyRealm() end
 		-- Override target indicator color with player's class color
 		self:HookClassColorTargetIndicator()
 		if np.classificationInstanceOnly then self:HookClassificationInstanceOnly() end
